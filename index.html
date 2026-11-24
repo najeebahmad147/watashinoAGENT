@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S. | Personal AI HUD</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', monospace; }
+    body {
+      background: radial-gradient(circle at center, #061826 0%, #01060a 100%);
+      color: #00f3ff; height: 100vh; overflow: hidden;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .hud-container {
+      width: 95%; max-width: 900px; height: 92vh;
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.15) inset;
+      display: flex; flex-direction: column; justify-content: space-between; padding: 20px;
+    }
+    .top-bar {
+      display: flex; justify-content: space-between;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.3); padding-bottom: 10px;
+      font-size: 0.9rem; letter-spacing: 2px;
+    }
+    .online { color: #00ff88; text-shadow: 0 0 8px #00ff88; }
+    .core-section { display: flex; flex-direction: column; align-items: center; margin: auto 0; }
+    .reactor-wrapper {
+      position: relative; width: 210px; height: 210px;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .ring { position: absolute; border-radius: 50%; border: 2px solid transparent; }
+    .ring-1 { width: 210px; height: 210px; border-top: 3px solid #00f3ff; border-bottom: 3px solid #00f3ff; animation: spin 8s linear infinite; }
+    .ring-2 { width: 170px; height: 170px; border-left: 3px dashed #00f3ff; border-right: 3px dashed #00f3ff; animation: spin-rev 5s linear infinite; }
+    .ring-3 { width: 135px; height: 135px; border: 2px solid rgba(0, 243, 255, 0.5); box-shadow: 0 0 20px #00f3ff; }
+    .reactor-wrapper.active .ring-3 { box-shadow: 0 0 45px #00f3ff, 0 0 80px #0088ff; transform: scale(1.08); transition: 0.3s; }
+    #mic-btn {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: rgba(0, 243, 255, 0.1); border: 2px solid #00f3ff;
+      color: #00f3ff; font-weight: bold; cursor: pointer; z-index: 5;
+    }
+    #mic-btn:hover { background: rgba(0, 243, 255, 0.25); box-shadow: 0 0 20px #00f3ff; }
+    #status-text { margin-top: 16px; font-size: 0.85rem; letter-spacing: 1.5px; color: #8be9fd; }
+    .terminal-box {
+      border: 1px solid rgba(0, 243, 255, 0.3); background: rgba(0, 15, 25, 0.7);
+      padding: 15px; height: 34%; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    #chat-log { overflow-y: auto; height: 75%; font-size: 0.9rem; line-height: 1.5; }
+    .user-msg { color: #fff; margin-bottom: 6px; }
+    .ai-msg { color: #00f3ff; margin-bottom: 8px; }
+    .input-area { display: flex; gap: 8px; }
+    input { flex: 1; background: rgba(0, 243, 255, 0.08); border: 1px solid #00f3ff; color: #fff; padding: 8px 12px; outline: none; }
+    button { background: rgba(0, 243, 255, 0.15); border: 1px solid #00f3ff; color: #00f3ff; padding: 8px 14px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #00f3ff; color: #000; }
+    .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 20; }
+    .hidden { display: none; }
+    .modal-content { background: #03121c; border: 1px solid #00f3ff; padding: 25px; width: 90%; max-width: 400px; text-align: center; }
+    .modal-content p { font-size: 0.8rem; margin: 10px 0 15px; color: #a0e9ff; }
+    .modal-actions { margin-top: 15px; display: flex; justify-content: center; gap: 10px; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @keyframes spin-rev { 100% { transform: rotate(-360deg); } }
+  </style>
+</head>
+<body>
+  <div class="hud-container">
+    <div class="top-bar">
+      <div>SYSTEM: <span class="online">ONLINE</span></div>
+      <div id="clock">00:00:00</div>
+      <div id="battery">PWR: --%</div>
+    </div>
+
+    <div class="core-section">
+      <div class="reactor-wrapper" id="reactor">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+        <button id="mic-btn">INITIATE</button>
+      </div>
+      <p id="status-text">Click the Core to Activate Voice Protocol</p>
+    </div>
+
+    <div class="terminal-box">
+      <div id="chat-log">
+        <p class="ai-msg">[J.A.R.V.I.S.]: Systems initialized. Awaiting your command, Boss.</p>
+      </div>
+      <div class="input-area">
+        <input type="text" id="text-input" placeholder="Type command or speak...">
+        <button id="send-btn">EXEC</button>
+        <button id="key-btn">API KEY</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="api-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>ENTER GROQ API KEY</h3>
+      <p>Paste your Groq key below:</p>
+      <input type="password" id="api-key-input" placeholder="Paste key here...">
+      <div class="modal-actions">
+        <button id="save-key-btn">SAVE PROTOCOL</button>
+        <button id="close-modal-btn">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const micBtn = document.getElementById("mic-btn");
+    const reactor = document.getElementById("reactor");
+    const statusText = document.getElementById("status-text");
+    const chatLog = document.getElementById("chat-log");
+    const textInput = document.getElementById("text-input");
+    const sendBtn = document.getElementById("send-btn");
+    const apiModal = document.getElementById("api-modal");
+    const keyBtn = document.getElementById("key-btn");
+    const saveKeyBtn = document.getElementById("save-key-btn");
+    const closeModalBtn = document.getElementById("close-modal-btn");
+    const apiKeyInput = document.getElementById("api-key-input");
+
+    let isSpeaking = false;
+    let chatHistory = [{
+      role: "system",
+      content: "You are J.A.R.V.I.S., Tony Stark's AI assistant with A-to-Z real-world knowledge. Call the user Boss or Sir. Answer accurately, concisely in 2 to 3 sentences, and in the user's language (English or Hinglish). No markdown symbols."
+    }];
+
+    setInterval(() => {
+      document.getElementById("clock").innerText = new Date().toLocaleTimeString();
+    }, 1000);
+
+    if ("getBattery" in navigator) {
+      navigator.getBattery().then(b => {
+        const up = () => document.getElementById("battery").innerText = "PWR: " + Math.round(b.level * 100) + "%";
+        up();
+        b.addEventListener("levelchange", up);
+      });
+    }
+
+    function speak(text) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+      const v = voices.find(x => x.lang.includes("en-GB")) || voices.find(x => x.lang.includes("en"));
+      if (v) u.voice = v;
+      u.pitch = 0.92;
+      u.rate = 1.03;
+      u.onstart = () => { isSpeaking = true; reactor.classList.add("active"); };
+      u.onend = () => { isSpeaking = false; reactor.classList.remove("active"); };
+      window.speechSynthesis.speak(u);
+    }
+
+    function addLog(sender, msg, isUser = false) {
+      const p = document.createElement("p");
+      p.className = isUser ? "user-msg" : "ai-msg";
+      p.innerText = "[" + sender + "]: " + msg;
+      chatLog.appendChild(p);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    async function processCommand(command) {
+      const cmd = command.toLowerCase().trim();
+      addLog("BOSS", command, true);
+
+      if (cmd.startsWith("open ")) {
+        const site = cmd.replace("open ", "").trim();
+        const domains = { youtube: "youtube.com", google: "google.com", github: "github.com", instagram: "instagram.com" };
+        if (domains[site]) {
+          const r = "Launching " + site + ", Boss.";
+          addLog("J.A.R.V.I.S.", r);
+          speak(r);
+          window.open(atob("aHR0cHM6Ly8=") + domains[site]);
+          return;
+        }
+      }
+
+      const apiKey = (localStorage.getItem("jarvisKey") || "").trim();
+      if (!apiKey) {
+        const r = "Boss, click the API KEY button and paste your Groq key to activate my global brain.";
+        addLog("J.A.R.V.I.S.", r);
+        speak(r);
+        return;
+      }
+
+      statusText.innerText = "PROCESSING QUERY...";
+      chatHistory.push({ role: "user", content: command });
+      if (chatHistory.length > 11) chatHistory = [chatHistory.at(0), ...chatHistory.slice(-10)];
+
+      try {
+        const apiUrl = atob("aHR0cHM6Ly9hcGkuZ3JvcS5jb20vb3BlbmFpL3YxL2NoYXQvY29tcGxldGlvbnM=");
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+          body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: chatHistory })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error?.message || "API Error");
+        const reply = data.choices.at(0).message.content.trim();
+        chatHistory.push({ role: "assistant", content: reply });
+        addLog("J.A.R.V.I.S.", reply);
+        speak(reply);
+      } catch (e) {
+        addLog("J.A.R.V.I.S.", "Error: " + e.message);
+      } finally {
+        statusText.innerText = "SYSTEM READY";
+      }
+    }
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      const rec = new SR();
+      rec.lang = "en-IN";
+      micBtn.onclick = () => {
+        if (isSpeaking) window.speechSynthesis.cancel();
+        rec.start();
+        statusText.innerText = "LISTENING...";
+        reactor.classList.add("active");
+      };
+      rec.onresult = e => { if (!isSpeaking) processCommand(e.results.item(0).item(0).transcript); };
+      rec.onend = () => { if (!isSpeaking) reactor.classList.remove("active"); };
+    }
+
+    sendBtn.onclick = () => { if (textInput.value.trim()) { processCommand(textInput.value); textInput.value = ""; } };
